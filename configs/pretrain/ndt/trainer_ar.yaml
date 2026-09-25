@@ -1,0 +1,111 @@
+# S3 -- Autoregressive ("GPT-brain") pretraining.
+
+
+seed: 42
+
+savestring: bit_ar_h
+wandb_project: bit_reproduction
+wandb_entity: null
+log_to_wandb: true
+
+verbosity: 0
+
+dirs:
+  data_dir: .
+  checkpoint_dir: checkpoints
+  log_dir: logs
+
+training:
+  num_epochs: 400
+  train_batch_size: 64
+  test_batch_size: 64
+  shuffle_test_dataloader: false
+  drop_last_test_dataloader: false
+  drop_last_train_dataloader: false
+  save_every: 25
+  eval_every: 1
+  mixed_precision: bf16
+
+model: include:configs/models/encoder/ndt.yaml
+
+data:
+  dataset_class: multi_ssl
+
+
+  subjects:
+    - willet_t12
+    - card_t15
+
+  neural_pile_max_train: 10000
+  neural_pile_source_filter:
+    - neural_pile_sub-Jenkins_churchland
+    - neural_pile_sub-Nitschke_churchland
+    - neural_pile_indy_makin
+    - neural_pile_loco_makin
+    - neural_pile_sub-C_perich
+    - neural_pile_sub-J_perich
+    - neural_pile_sub-M_perich
+    - neural_pile_sub-T_perich
+    - neural_pile_sub-Han_area2-bump
+    - neural_pile_sub-JenkinsC_even-chen
+    - neural_pile_sub-Reggie_even-chen
+    - neural_pile_sub-Monkey-N_temmar
+
+
+  add_holdout_to_train: true
+
+  train_name: train
+  val_name: val
+  test_name: test
+  train_len: null
+  val_len: null
+  test_len: null
+
+method:
+  model_kwargs:
+    method_name: ar
+    loss: mse
+    log_input: false
+
+  metric_kwargs:
+    metric_name: r2
+    n_print: 0
+
+  dataset_kwargs:
+    dataset_name: willet_t12
+    batch_size: 1
+    window_size: null
+
+  dataloader_kwargs:
+    pad_dict:
+      spikes:
+        - dim: 0
+          side: right
+          value: -100
+          truncate: 2400
+          min_length: null
+          max_length: null
+      spikes_mask:
+        - dim: 0
+          side: right
+          value: 0
+          truncate: 2400
+          min_length: null
+          max_length: null
+      spikes_timestamp:
+        - dim: 0
+          side: right
+          value: 0
+          truncate: 2400
+          min_length: null
+          max_length: null
+
+optimizer:
+  gradient_accumulation_steps: 1
+  lr: 5.e-4
+  wd: 1.e-5
+  eps: 1.e-8
+  warmup_pct: 0.0
+  gamma: 0.95
+  div_factor: 25
+  scheduler: cosine

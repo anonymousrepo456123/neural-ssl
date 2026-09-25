@@ -1,0 +1,198 @@
+# BIT I-JEPA v1 — human-large + monkey pretraining.
+#
+# Model: NDT_JEPA (SmoothL1, cosine EMA 0.996→1.0, no context loss).
+# Dataset pool: all human datasets + 7 individual primate datasets
+# (NO neural pile). Perich limited to the top-10 sessions by trial count.
+#
+# Launch:
+#   python pretrain_all_humans.py \
+#       --config configs/pretrain/ndt/trainer_jepa_human_monkey.yaml \
+#       --primate temmar chowdhury ma evenchen churchland odoherty perich \
+#       --max-perich-sessions 10 \
+#       --cap-per-subject-per-epoch 10000
+
+seed: 42
+
+savestring: bit_jepa_human_monkey
+wandb_project: bit_reproduction
+wandb_entity: null
+log_to_wandb: true
+
+verbosity: 0
+
+dirs:
+  data_dir: .
+  checkpoint_dir: checkpoints
+  log_dir: logs
+
+training:
+  num_epochs: 400
+  train_batch_size: 64
+  test_batch_size: 64
+  shuffle_test_dataloader: false
+  drop_last_test_dataloader: false
+  drop_last_train_dataloader: false
+  save_every: 25
+  eval_every: 1
+  mixed_precision: bf16
+  train_per_subject_cap: 10000
+
+model:
+  model_class: NDT_JEPA
+
+  encoder:
+    from_pt: null
+
+    context:
+      forward: -1
+      backward: -1
+
+    smooth_and_noise:
+      noise: true
+      smooth_sd: 2
+      white_noise_sd: 0.2
+      constant_offset_sd: 0.05
+
+    embedder:
+      stitch: true
+      patch_size: 5
+      masker:
+        active: true
+        ratio: 0.5
+        expand_prob: 1.0
+        max_timespan: 15
+      max_F: 2500
+      max_channels: 256
+      input_dim: 256
+      pos: false
+      act: softsign
+      bias: true
+      dropout: 0.2
+
+    transformer:
+      n_layers: 7
+      hidden_size: 384
+      use_rope: true
+      rope_theta: 10000.0
+      n_heads: 6
+      attention_bias: true
+      act: gelu
+      inter_size: 512
+      mlp_bias: true
+      dropout: 0.4
+      fixup_init: true
+
+    factors:
+      active: false
+      size: 384
+      act: relu
+      bias: true
+      dropout: 0.0
+      fixup_init: false
+      init_range: 0.1
+
+  predictor:
+    n_layers: 6
+    hidden_size: 384
+    n_heads: 6
+    inter_size: 512
+    use_rope: true
+    rope_theta: 10000.0
+    attention_bias: true
+    act: gelu
+    mlp_bias: true
+    dropout: 0.1
+    fixup_init: true
+
+data:
+  dataset_class: multi_ssl
+  subjects:
+    - willet_t12
+    - card_t15
+    - kunz_t12
+    - kunz_t15
+    - kunz_t16
+    - kunz_t17
+    - willett_handwriting
+    - fan_handwriting
+    - wairagkar
+    - jude_speech_anarthia
+    - jude_typing_t17
+    - jude_typing_t18
+    - karpowicz_falcon
+    - cursor_karpowicz
+    - cursor_singer_clark
+    - cursor_wilson
+    - primate_temmar
+    - primate_chowdhury
+    - primate_ma
+    - primate_evenchen
+    - primate_churchland
+    - primate_odoherty
+    - primate_perich
+
+  neural_pile_max_train: null
+  neural_pile_source_filter: null
+
+  add_holdout_to_train: true
+  add_human_test_to_train: true
+  add_primate_val_test_to_train: true
+
+  train_name: train
+  val_name: val
+  test_name: test
+  train_len: null
+  val_len: null
+  test_len: null
+
+method:
+  model_kwargs:
+    method_name: jepa
+
+    momentum_start: 0.996
+    momentum_end:   1.0
+    momentum_schedule: cosine
+
+    norm_target: true
+
+  metric_kwargs:
+    metric_name: r2_latent
+    n_print: 0
+
+  dataset_kwargs:
+    dataset_name: willet_t12
+    batch_size: 1
+
+  dataloader_kwargs:
+    pad_dict:
+      spikes:
+        - dim: 0
+          side: right
+          value: -100
+          truncate: 2400
+          min_length: null
+          max_length: null
+      spikes_mask:
+        - dim: 0
+          side: right
+          value: 0
+          truncate: 2400
+          min_length: null
+          max_length: null
+      spikes_timestamp:
+        - dim: 0
+          side: right
+          value: 0
+          truncate: 2400
+          min_length: null
+          max_length: null
+
+optimizer:
+  gradient_accumulation_steps: 1
+  lr: 5.e-4
+  wd: 1.e-5
+  eps: 1.e-8
+  warmup_pct: 0.05
+  gamma: 0.95
+  div_factor: 25
+  scheduler: cosine

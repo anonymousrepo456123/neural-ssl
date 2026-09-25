@@ -1,0 +1,124 @@
+# BIT MAE pretraining — human + primate datasets (no neural pile).
+#
+
+seed: 42
+
+savestring: bit_mae_human_monkey_probe
+wandb_project: bit_reproduction
+wandb_entity: null
+log_to_wandb: true
+
+verbosity: 0
+
+dirs:
+  data_dir: .
+  checkpoint_dir: checkpoints
+  log_dir: logs
+
+training:
+  num_epochs: 400
+  train_batch_size: 64
+  test_batch_size: 64
+  shuffle_test_dataloader: false
+  drop_last_test_dataloader: false
+  drop_last_train_dataloader: false
+  save_every: 10
+  eval_every: 1
+  mixed_precision: bf16
+
+model: include:configs/models/encoder/ndt.yaml
+
+data:
+  dataset_class: multi_ssl
+
+  subjects:
+    # Human BCI datasets
+    - willet_t12
+    - card_t15
+    - kunz_t12
+    - kunz_t15
+    - kunz_t16
+    - kunz_t17
+    - willett_handwriting
+    - fan_handwriting
+    - wairagkar
+    - jude_speech_anarthia
+    - jude_typing_t17
+    - jude_typing_t18
+    # Primate datasets (preprocessed locally — NOT from the neural pile)
+    - primate_temmar
+    - primate_chowdhury
+    - primate_ma
+    - primate_evenchen
+    - primate_churchland
+    - primate_odoherty
+
+  # Cap on train records for primate datasets (sum across all 6 datasets).
+  # Temmar alone has 93750 trials; without a cap it dominates gradient steps.
+  primate_max_train: null
+
+  # Also adds the human test splits to the training set.
+  add_human_test_to_train: true
+
+  # Also adds primate val and test splits to the training set.
+  add_primate_val_test_to_train: true
+
+  # We do not use the neural pile — these fields are ignored.
+  neural_pile_max_train: null
+  neural_pile_source_filter: null
+
+  train_name: train
+  val_name: val
+  test_name: test
+  train_len: null
+  val_len: null
+  test_len: null
+
+method:
+  model_kwargs:
+    method_name: ssl
+    loss: mse
+    log_input: false
+
+  metric_kwargs:
+    metric_name: r2
+    n_print: 0
+
+  dataset_kwargs:
+    dataset_name: willet_t12
+    batch_size: 1
+    window_size: null
+
+  dataloader_kwargs:
+    pad_dict:
+      spikes:
+        - dim: 0
+          side: right
+          value: -100
+          truncate: 2400
+          min_length: null
+          max_length: null
+      spikes_mask:
+        - dim: 0
+          side: right
+          value: 0
+          truncate: 2400
+          min_length: null
+          max_length: null
+      spikes_timestamp:
+        - dim: 0
+          side: right
+          value: 0
+          truncate: 2400
+          min_length: null
+          max_length: null
+
+optimizer:
+  gradient_accumulation_steps: 1
+  lr: 5.e-4
+  wd: 1.e-5
+  eps: 1.e-8
+  warmup_pct: 0.0
+  gamma: 0.95
+  div_factor: 25
+  scheduler: cosine
